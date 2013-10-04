@@ -1,4 +1,4 @@
-# ! /usr/bin/env python
+#! /usr/bin/env python
 '''
 ABOUT:
 This program performs basic aperture photometry though PyRAF.  Photometry
@@ -38,7 +38,7 @@ class Photometry():
     Parent class
     '''
     
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
     def __init__(self, root, data_list, threshold, tolerance, apertures):
         '''
@@ -59,7 +59,7 @@ class Photometry():
         self.explist, self.zptlist, self.fwhmlist, self.sigmalist \
                     = loadtxt(self.data_list, unpack=True, usecols=[1,2,3,4])
         
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
     def run_all(self):
         '''
@@ -77,7 +77,7 @@ class Photometry():
         self.apcorr_plot()
         self.write_results()
         
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
         
     def remove_existing_files(self):
         '''
@@ -94,7 +94,7 @@ class Photometry():
                 if os.path.exists(file):
                     os.remove(file)
                     
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
     def unit_converter(self):
         '''
@@ -105,7 +105,7 @@ class Photometry():
             iraf.imarith(operand1=image + '[1]', op='*', operand2=exptime, \
                          result=image[:9] + '_counts.fits')
                          
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
     def source_find(self):
         '''
@@ -125,7 +125,7 @@ class Photometry():
             iraf.daofind(image=image, output=image[:-12] + '_sources.dat', \
                          verify='no', verbose='no')
                          
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
         
     def source_match(self):
         '''
@@ -141,7 +141,7 @@ class Photometry():
                            output=image[:-12] + '_match.dat', \
                            tolerance=self.tolerance, verbose='no')
                            
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
     def do_photometry(self):
         '''
@@ -159,7 +159,7 @@ class Photometry():
                               output=image[:-12] + '_phot.dat', verify='no', \
                               verbose='no')
                               
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
     def textdump(self):
         '''
@@ -186,13 +186,12 @@ class Photometry():
             rfile.close()
             os.remove(image[:-12] + '_txtdump_tmp.dat')
             
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
-    def mag_calc(self):
+    def insmag_calc(self):
         '''
         Calculates the instrumental magnitude and difference in magnitude 
-        between apertures.  Calculates the zeropoint offset.  Calculates the
-        VEGAmag magnitudes.  
+        between apertures. 
         '''
         
         txtdumplist = glob.glob(root + '/*txtdump.dat')
@@ -205,25 +204,14 @@ class Photometry():
             insmag2 = -2.5*np.log10(counts2/exptme)
             delta_mag = (insmag1 - insmag2)  
             
-            sum = 0.0
-            tot = 0
-            for width in insmag1:
-                if -6.6 < width < -3.29:
-                    for height in delta_mag:
-                        if 0.035 < height < 0.087:
-                            sum = sum + height
-                            tot = tot + 1
-            zpt_off =  (sum / tot)
-            vegamag = zpt - zpt_off + insmag1
+            return counts1, counts2, insmag1, insmag2, delta_mag
             
-            return counts1, counts2, insmag1, insmag2, delta_mag, vegamag
-            
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     
     def apcorr_plot(self):
         '''
         Creates a plot of delta_mag versus instru_mag to determine in which
-        region(s) to compute zpt_off
+        region(s) to compute zpt_off.
         '''
         
         counts1, counts2, insmag1, insmag2, delta_mag, vegamag = \
@@ -244,9 +232,44 @@ class Photometry():
             mpl.xlabel('-2.5 log(flux)')
             mpl.scatter(insmag1, delta_mag, s=1, c='k')
             mpl.savefig(image[:-9] + '_apcorr.png')
-            mpl.clf()
+            left = raw_input('left: ')
+            right = raw_input('right: ')
+            bottom = raw_input('bottom: ')
+            top = raw_input('top: ')
+            mpl.close()
             
-    # ------------------------------------------------------------------------
+            zpt_off_calc(left, right, top, bottom)
+            
+    # -------------------------------------------------------------------------
+            
+    def zpt_off_calc(self):
+        '''
+        Calculates the zeropoint offset based on the user-specified parameters
+        determined from the aperture correction plot.
+        '''
+            
+        sum = 0.0
+        tot = 0
+        for width in insmag1:
+            if left < width < right:
+                for height in delta_mag:
+                    if bottom < height < top:
+                        sum = sum + height
+                        tot = tot + 1
+        zpt_off =  (sum / tot)
+        
+        vegamag_calc(zpt_off)
+        
+    # -------------------------------------------------------------------------
+    
+    def vegamag_calc(self):
+        '''
+        Calculates the VEGAMAG magnitudes.
+        '''
+        
+        vegamag = zpt - zpt_off + insmag1
+            
+    # -------------------------------------------------------------------------
     
     def write_results(self):
         '''
@@ -272,7 +295,7 @@ class Photometry():
             file.write(header)
             file.close()
         
-    # ------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
 
 if __name__ == '__main__':
     
