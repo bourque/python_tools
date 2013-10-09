@@ -1,8 +1,65 @@
+#! /usr/bin/env python
+
+'''
+ABOUT:
+This program creates average row and/or average column plots on FITS images.
+Plots can be created for individual images or a list of images placed in a
+text file, one image per line.  One can specify to plot average row and/or
+average column with the -p or --plot_type argument.  Specifying the
+-a or --all_switch will create one plot per image (if "off") or one plot
+for all images in the list (if "on").  The save desitation of the plots
+can be specified with the -s or --save_dst argument.  By default, both
+average columns and average row plots will be created, one per image, and
+saved in the current working directory.
+
+The image of interest of the list of images of interest must the the first
+argument for command line execution and must contain the extension and
+indices to plot over.  For example:
+
+python avg_row_col.py abcdefgh_flt.fits[1][100:300,550:650]
+
+AUTHOR:
+Matthew Bourque
+Space Telescope Science Institute
+bourque@stsci.edu
+
+LAST UPDATED:
+10/09/2013 (Bourque)
+'''
+
 import argparse
 import numpy as np
 import os
 import pyfits
 import matplotlib.pyplot as plt
+
+# -----------------------------------------------------------------------------
+
+def get_image_list(image):
+	'''
+	Reads in one image or a list of images and returns a python list of the 
+	image(s).  Also ensures each image string contains FITS extension and
+	indices.
+	'''
+
+	# For single image:
+	if '.fits' in image:
+		images = [image]
+
+	# For a list of images:
+	else:
+		with open(image, 'r') as image_file:
+			images = image_file.readlines()
+		images = [line.strip() for line in images]
+
+	# Ensure images have FITS extension and indices by checking "[" and "]".
+	for image in images:
+		assert len([i for i in image if i == '[']) == 2, 'Missing or ' + \
+			'Invalid extension or indices.'
+		assert len([i for i in image if i == ']']) == 2, 'Missing or ' + \
+			'Invalid extension or indices.'
+
+	return images
 
 # -----------------------------------------------------------------------------
 
@@ -14,14 +71,14 @@ def plot_all_data(frames, exts, values, save_dst, descrip):
 	fig = plt.figure()
 	plt.minorticks_on()
 	plt.grid()
-	plt.xlabel(descrip + ' (pixels)', labelpad = 10)
+	plt.xlabel(descrip + ' (pixels)', labelpad=10)
 	plt.title('Average of ' + descrip + 's')
 	lengths = [len(value) for value in values]
 	plt.xlim([0, max(lengths) - 1])
 	
 	for frame, ext, value in zip(frames, exts, values):
-		plt.plot(value, markersize = 4, markerfacecolor = 'none', 
-				 label = frame + '[' + ext + ']')
+		plt.plot(value, markersize=4, markerfacecolor='none', 
+				 label=frame + '[' + ext + ']')
 	plt.legend()
 	filename = save_dst + 'avg_' + descrip.lower() + '_ext' + ext + '.png'
 	plt.savefig(filename)
@@ -38,10 +95,10 @@ def plot_single_data(frames, exts, values, save_dst, descrip):
 		fig = plt.figure()
 		plt.minorticks_on()
 		plt.grid()
-		plt.xlabel(descrip + ' (pixels)', labelpad = 10)
+		plt.xlabel(descrip + ' (pixels)', labelpad=10)
 		plt.title('Average of ' + descrip + 's')
 		plt.xlim([0, len(values[0])])
-		plt.plot(value, 'k', markersize = 4, markerfacecolor = 'none')
+		plt.plot(value, 'k', markersize=4, markerfacecolor='none')
 		filename = save_dst + frame.split('.')[0] + '_avg_' + \
 				   descrip.lower() + '_ext' + ext + '.png'
 		plt.savefig(filename)
@@ -51,25 +108,20 @@ def plot_single_data(frames, exts, values, save_dst, descrip):
 # The main controller
 # -----------------------------------------------------------------------------
 
-def avg_row_col_main(image, plot_type, all_switch, save_dst):
+def avg_row_col_main(images, plot_type, all_switch, save_dst):
 	'''
 	The main controller.
 	'''
 
 	# Construct list of images to be examined
-	if '.fits' in image:
-		images = [image]
-	else:
-		with open(image, 'r') as image_file:
-			images = image_file.readlines()
-		images = [line.strip() for line in images]
+	image_list = get_image_list(images)
 
 	# Parse filename, ext, and indices.
-	frames = [image.split('[')[0] for image in images]
-	exts = [image.split('[')[1][0] for image in images]
-	x_indices = [image.split('[')[-1].split(',')[0] for image in images]
+	frames = [image.split('[')[0] for image in image_list]
+	exts = [image.split('[')[1][0] for image in image_list]
+	x_indices = [image.split('[')[-1].split(',')[0] for image in image_list]
 	y_indices = [image.split('[')[-1].split(',')[1].strip(']') 
-				 for image in images]
+				 for image in image_list]
 	x1s = [int(x.split(':')[0]) for x in x_indices]
 	x2s = [int(x.split(':')[1]) for x in x_indices]
 	y1s = [int(y.split(':')[0]) for y in y_indices]
@@ -83,9 +135,9 @@ def avg_row_col_main(image, plot_type, all_switch, save_dst):
 		open_frame.close()
 
 	# Calculate average row or column
-	avg_row_list = [ext_data[y1:y2,x1:x2].mean(axis = 1) for ext_data, y1, y2, 
+	avg_row_list = [ext_data[y1:y2,x1:x2].mean(axis=1) for ext_data, y1, y2, 
 				    x1, x2 in zip(ext_data_list, y1s, y2s, x1s, x2s)]
-	avg_col_list = [ext_data[y1:y2,x1:x2].mean(axis = 0) for ext_data, y1, y2, 
+	avg_col_list = [ext_data[y1:y2,x1:x2].mean(axis=0) for ext_data, y1, y2, 
 					x1, x2 in zip(ext_data_list, y1s, y2s, x1s, x2s)]
 
 	# Set plotting parameters
@@ -133,18 +185,16 @@ def parse_args():
 
     # Add time arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', dest = 'images', action = 'store', 
-    					type = str, required = True, help = image_help)
-    parser.add_argument('-p', dest = 'plot_type', action = 'store',
-                        type = str, required = False, default = 'both',
-                        help = plot_type_help)
-    parser.add_argument('-a', dest = 'all_switch', action = 'store',
-    					type = str, required = False, default = 'off',
-    					help = all_switch_help)
-    parser.add_argument('-s', dest = 'save_dst', action = 'store',
-    					type = str, required = False, 
-    					default = os.getcwd() + '/',
-    					help = save_dst_help)
+    parser.add_argument('images', type=str, help=image_help)
+    parser.add_argument('-p', '--plot_type', dest='plot_type', 
+    					action='store', type=str, required=False, 
+    					default='both', help=plot_type_help)
+    parser.add_argument('-a', '--all_switch', dest = 'all_switch', 
+    					action='store', type=str, required=False, 
+    					default='off', help=all_switch_help)
+    parser.add_argument('-s', '--save_dst', dest='save_dst', 
+    					action='store', type=str, required=False, 
+    					default=os.getcwd() + '/', help=save_dst_help)
 
     # Parse args
     args = parser.parse_args()
