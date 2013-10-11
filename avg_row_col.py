@@ -44,6 +44,20 @@ class AvgRowCol():
 
     # -------------------------------------------------------------------------
 
+    def calc_avg(self):
+        '''
+        Calculates the average row and column value.
+        '''
+
+        self.avg_row_list = [ext_data[x1:x2,y1:y2].mean(axis=1) for ext_data, 
+            x1, x2, y1, y2 in zip(self.ext_data_list, self.x1s, self.x2s, 
+            self.y1s, self.y2s)]
+        self.avg_col_list = [ext_data[x1:x2,y1:y2].mean(axis=0) for ext_data, 
+            x1, x2, y1, y2 in zip(self.ext_data_list, self.x1s, self.x2s, 
+            self.y1s, self.y2s)]
+
+    # -------------------------------------------------------------------------
+
     def get_image_list(self):
         '''
         Reads in one image or a list of images and returns a python list of the
@@ -67,6 +81,24 @@ class AvgRowCol():
                 'Invalid extension or indices.'
             assert len([i for i in image if i == ']']) == 2, 'Missing or ' + \
                 'Invalid extension or indices.'
+
+    # -------------------------------------------------------------------------
+
+    def parse_image_info(self):
+        '''
+        Determines the extension and indices of the input files.
+        '''
+
+        self.frames = [image.split('[')[0] for image in self.image_list]
+        self.exts = [image.split('[')[1][0] for image in self.image_list]
+        y_indices = [image.split('[')[-1].split(',')[0] for image in 
+                     self.image_list]
+        x_indices = [image.split('[')[-1].split(',')[1].strip(']') 
+                     for image in self.image_list]
+        self.x1s = [int(x.split(':')[0]) for x in x_indices]
+        self.x2s = [int(x.split(':')[1]) for x in x_indices]
+        self.y1s = [int(y.split(':')[0]) for y in y_indices]
+        self.y2s = [int(y.split(':')[1]) for y in y_indices]
 
     # -------------------------------------------------------------------------
 
@@ -115,6 +147,16 @@ class AvgRowCol():
             print 'Saved figure to ' + filename
 
     # -------------------------------------------------------------------------
+
+    def read_data(self):
+        '''
+        Uses pyfits to read in image data.
+        '''
+
+        self.ext_data_list = [pyfits.open(frame)[int(ext)].data for frame, 
+                              ext in zip(self.frames, self.exts)]
+
+    # -------------------------------------------------------------------------
     # The main controller
     # -------------------------------------------------------------------------
 
@@ -123,35 +165,10 @@ class AvgRowCol():
         The main controller.
         '''
 
-        # Construct list of images to be examined
         self.get_image_list()
-
-        # Parse filename, ext, and indices.
-        self.frames = [image.split('[')[0] for image in self.image_list]
-        self.exts = [image.split('[')[1][0] for image in self.image_list]
-        y_indices = [image.split('[')[-1].split(',')[0] for image in 
-                     self.image_list]
-        x_indices = [image.split('[')[-1].split(',')[1].strip(']') 
-                     for image in self.image_list]
-        x1s = [int(x.split(':')[0]) for x in x_indices]
-        x2s = [int(x.split(':')[1]) for x in x_indices]
-        y1s = [int(y.split(':')[0]) for y in y_indices]
-        y2s = [int(y.split(':')[1]) for y in y_indices]
-
-        # Read in data
-        ext_data_list = []
-        for frame,ext in zip(self.frames, self.exts):
-            open_frame = pyfits.open(frame)
-            ext_data_list.append(open_frame[int(ext)].data)
-            open_frame.close()
-
-        # Calculate average row or column
-        avg_row_list = [ext_data[x1:x2,y1:y2].mean(axis=1) for ext_data, 
-                        x1, x2, y1, y2 in zip(ext_data_list, x1s, x2s, 
-                        y1s, y2s)]
-        avg_col_list = [ext_data[x1:x2,y1:y2].mean(axis=0) for ext_data, 
-                        x1, x2, y1, y2 in zip(ext_data_list, x1s, x2s, 
-                        y1s, y2s)]
+        self.parse_image_info()
+        self.read_data()
+        self.calc_avg()
 
         # Set plotting parameters
         plt.rcParams['legend.fontsize'] = 10
@@ -163,16 +180,16 @@ class AvgRowCol():
             self.descrip = 'Row'
             self.anti_descrip = 'Column'
             if self.all_switch == 'off':
-                self.plot_single_data(avg_row_list)
+                self.plot_single_data(self.avg_row_list)
             elif self.all_switch == 'on':
-                self.plot_all_data(avg_row_list)
-        if self.plot_type == 'col' or self.plot_type == 'both':
+                self.plot_all_data(self.avg_row_list)
+        elif self.plot_type == 'col' or self.plot_type == 'both':
             self.descrip = 'Column'
             self.anti_descrip = 'Row'
             if self.all_switch == 'off':
-                self.plot_single_data(avg_col_list)
+                self.plot_single_data(self.avg_col_list)
             elif self.all_switch == 'on':
-                self.plot_all_data(avg_col_list)
+                self.plot_all_data(self.avg_col_list)
 
 
 # -----------------------------------------------------------------------------
