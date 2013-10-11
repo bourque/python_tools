@@ -17,14 +17,6 @@ argument for command line execution and must contain the extension and
 indices to plot over.  For example:
 
 python avg_row_col.py abcdefgh_flt.fits[1][100:300,550:650]
-
-AUTHOR:
-Matthew Bourque
-Space Telescope Science Institute
-bourque@stsci.edu
-
-LAST UPDATED:
-10/09/2013 (Bourque)
 '''
 
 import argparse
@@ -33,131 +25,154 @@ import os
 import pyfits
 import matplotlib.pyplot as plt
 
-# -----------------------------------------------------------------------------
-
-def get_image_list(image):
+class AvgRowCol():
     '''
-    Reads in one image or a list of images and returns a python list of the 
-    image(s).  Also ensures each image string contains FITS extension and
-    indices.
+    Parent class.
     '''
 
-    # For single image:
-    if '.fits' in image:
-        images = [image]
+    # -------------------------------------------------------------------------
 
-    # For a list of images:
-    else:
-        with open(image, 'r') as image_file:
-            images = image_file.readlines()
-        images = [line.strip() for line in images]
+    def __init__(self, images, plot_type, all_switch, save_dst):
+        '''
+        Assigns argument variables to class instances.
+        '''
 
-    # Ensure images have FITS extension and indices by checking "[" and "]".
-    for image in images:
-        assert len([i for i in image if i == '[']) == 2, 'Missing or ' + \
-            'Invalid extension or indices.'
-        assert len([i for i in image if i == ']']) == 2, 'Missing or ' + \
-            'Invalid extension or indices.'
+        self.images = images
+        self.plot_type = plot_type
+        self.all_switch = all_switch
+        self.save_dst = save_dst
 
-    return images
+    # -------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
+    def get_image_list(self):
+        '''
+        Reads in one image or a list of images and returns a python list of the
+        image(s).  Also ensures each image string contains FITS extension and
+        indices.
+        '''
 
-def plot_all_data(frames, exts, values, save_dst, descrip):
-    '''
-    Creates the average col or row plot, plotting all images on the same plot.
-    '''
+        # For single image:
+        if '.fits' in self.images:
+            self.images = [self.images]
 
-    fig = plt.figure()
-    plt.minorticks_on()
-    plt.grid()
-    plt.xlabel(descrip + ' (pixels)', labelpad=10)
-    plt.title('Average of ' + descrip + 's')
-    lengths = [len(value) for value in values]
-    plt.xlim([0, max(lengths) - 1])
-    
-    for frame, ext, value in zip(frames, exts, values):
-        plt.plot(value, markersize=4, markerfacecolor='none', 
-                 label=frame + '[' + ext + ']')
-    plt.legend()
-    filename = save_dst + 'avg_' + descrip.lower() + '_ext' + ext + '.png'
-    plt.savefig(filename)
-    print 'Saved figure to ' + filename
+        # For a list of images:
+        else:
+            with open(self.images, 'r') as image_file:
+                self.image_list = image_file.readlines()
+            self.image_list = [line.strip() for line in self.image_list]
 
-# -----------------------------------------------------------------------------
+        # Ensure images have extension and indices by checking "[" and "]".
+        for image in self.image_list:
+            assert len([i for i in image if i == '[']) == 2, 'Missing or ' + \
+                'Invalid extension or indices.'
+            assert len([i for i in image if i == ']']) == 2, 'Missing or ' + \
+                'Invalid extension or indices.'
 
-def plot_single_data(frames, exts, values, save_dst, descrip):
-    '''
-    Creates the average col or row plot for each image.
-    '''
+    # -------------------------------------------------------------------------
 
-    for frame, ext, value in zip(frames, exts, values):
+    def plot_all_data(self, values):
+        '''
+        Creates the average col or row plot, plotting all images on the 
+        same plot.
+        '''
+
         fig = plt.figure()
         plt.minorticks_on()
         plt.grid()
-        plt.xlabel(descrip + ' (pixels)', labelpad=10)
-        plt.title('Average of ' + descrip + 's')
-        plt.xlim([0, len(values[0])])
-        plt.plot(value, 'k', markersize=4, markerfacecolor='none')
-        filename = save_dst + frame.split('.')[0] + '_avg_' + \
-                   descrip.lower() + '_ext' + ext + '.png'
+        plt.xlabel(self.descrip + ' (pixels)', labelpad=10)
+        plt.title('Average of ' + self.anti_descrip + 's')
+        lengths = [len(value) for value in values]
+        plt.xlim([0, max(lengths) - 1])
+        
+        for frame, ext, value in zip(self.frames, self.exts, values):
+            plt.plot(value, markersize=4, markerfacecolor='none', 
+                     label=frame + '[' + ext + ']')
+        plt.legend()
+        filename = os.path.join(self.save_dst, 
+            'avg_' + self.anti_descrip.lower() + '_ext' + ext + '.png')
         plt.savefig(filename)
         print 'Saved figure to ' + filename
 
-# -----------------------------------------------------------------------------
-# The main controller
-# -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
 
-def avg_row_col_main(images, plot_type, all_switch, save_dst):
-    '''
-    The main controller.
-    '''
+    def plot_single_data(self, values):
+        '''
+        Creates the average col or row plot for each image.
+        '''
 
-    # Construct list of images to be examined
-    image_list = get_image_list(images)
+        for frame, ext, value in zip(self.frames, self.exts, values):
+            fig = plt.figure()
+            plt.minorticks_on()
+            plt.grid()
+            plt.xlabel(self.descrip + ' (pixels)', labelpad=10)
+            plt.title('Average of ' + self.anti_descrip + 's')
+            plt.xlim([0, len(values[0])])
+            plt.plot(value, 'k', markersize=4, markerfacecolor='none')
+            filename = os.path.join(save_dst, frame.split('.')[0] + '_avg_' + \
+                                    self.anti_descrip.lower() + '_ext' + ext + \
+                                    '.png')
+            plt.savefig(filename)
+            print 'Saved figure to ' + filename
 
-    # Parse filename, ext, and indices.
-    frames = [image.split('[')[0] for image in image_list]
-    exts = [image.split('[')[1][0] for image in image_list]
-    x_indices = [image.split('[')[-1].split(',')[0] for image in image_list]
-    y_indices = [image.split('[')[-1].split(',')[1].strip(']') 
-                 for image in image_list]
-    x1s = [int(x.split(':')[0]) for x in x_indices]
-    x2s = [int(x.split(':')[1]) for x in x_indices]
-    y1s = [int(y.split(':')[0]) for y in y_indices]
-    y2s = [int(y.split(':')[1]) for y in y_indices]
+    # -------------------------------------------------------------------------
+    # The main controller
+    # -------------------------------------------------------------------------
 
-    # Read in data
-    ext_data_list = []
-    for frame,ext in zip(frames, exts):
-        open_frame = pyfits.open(frame)
-        ext_data_list.append(open_frame[int(ext)].data)
-        open_frame.close()
+    def avg_row_col_main(self):
+        '''
+        The main controller.
+        '''
 
-    # Calculate average row or column
-    avg_row_list = [ext_data[y1:y2,x1:x2].mean(axis=1) for ext_data, y1, y2, 
-                    x1, x2 in zip(ext_data_list, y1s, y2s, x1s, x2s)]
-    avg_col_list = [ext_data[y1:y2,x1:x2].mean(axis=0) for ext_data, y1, y2, 
-                    x1, x2 in zip(ext_data_list, y1s, y2s, x1s, x2s)]
+        # Construct list of images to be examined
+        self.get_image_list()
 
-    # Set plotting parameters
-    plt.rcParams['legend.fontsize'] = 10
-    plt.rcParams['font.family'] = 'Helvetica'
-    plt.minorticks_on()
+        # Parse filename, ext, and indices.
+        self.frames = [image.split('[')[0] for image in self.image_list]
+        self.exts = [image.split('[')[1][0] for image in self.image_list]
+        y_indices = [image.split('[')[-1].split(',')[0] for image in 
+                     self.image_list]
+        x_indices = [image.split('[')[-1].split(',')[1].strip(']') 
+                     for image in self.image_list]
+        x1s = [int(x.split(':')[0]) for x in x_indices]
+        x2s = [int(x.split(':')[1]) for x in x_indices]
+        y1s = [int(y.split(':')[0]) for y in y_indices]
+        y2s = [int(y.split(':')[1]) for y in y_indices]
 
-    # Plot the data
-    if plot_type == 'row' or plot_type == 'both':
-        descrip = 'Row'
-        if all_switch == 'off':
-            plot_single_data(frames, exts, avg_row_list, save_dst, descrip)
-        elif all_switch == 'on':
-            plot_all_data(frames, exts, avg_row_list, save_dst, descrip)
-    if plot_type == 'col' or plot_type == 'both':
-        descrip = 'Column'
-        if all_switch == 'off':
-            plot_single_data(frames, exts, avg_col_list, save_dst, descrip)
-        elif all_switch == 'on':
-            plot_all_data(frames, exts, avg_col_list, save_dst, descrip)
+        # Read in data
+        ext_data_list = []
+        for frame,ext in zip(self.frames, self.exts):
+            open_frame = pyfits.open(frame)
+            ext_data_list.append(open_frame[int(ext)].data)
+            open_frame.close()
+
+        # Calculate average row or column
+        avg_row_list = [ext_data[x1:x2,y1:y2].mean(axis=1) for ext_data, 
+                        x1, x2, y1, y2 in zip(ext_data_list, x1s, x2s, 
+                        y1s, y2s)]
+        avg_col_list = [ext_data[x1:x2,y1:y2].mean(axis=0) for ext_data, 
+                        x1, x2, y1, y2 in zip(ext_data_list, x1s, x2s, 
+                        y1s, y2s)]
+
+        # Set plotting parameters
+        plt.rcParams['legend.fontsize'] = 10
+        plt.rcParams['font.family'] = 'Helvetica'
+        plt.minorticks_on()
+
+        # Plot the data
+        if self.plot_type == 'row' or self.plot_type == 'both':
+            self.descrip = 'Row'
+            self.anti_descrip = 'Column'
+            if self.all_switch == 'off':
+                self.plot_single_data(avg_row_list)
+            elif self.all_switch == 'on':
+                self.plot_all_data(avg_row_list)
+        if self.plot_type == 'col' or self.plot_type == 'both':
+            self.descrip = 'Column'
+            self.anti_descrip = 'Row'
+            if self.all_switch == 'off':
+                self.plot_single_data(avg_col_list)
+            elif self.all_switch == 'on':
+                self.plot_all_data(avg_col_list)
 
 
 # -----------------------------------------------------------------------------
@@ -209,7 +224,7 @@ def test_args(args):
     '''
 
     # Assert image or image list exists.
-    assert os.path.exists(args.images) == True, 'File ' + images + 'Does' + \
+    assert os.path.exists(args.images) == True, 'File ' + images + 'does' + \
         'not exist.'
 
     # Assert plot_type is "row", "col", or "both".
@@ -229,5 +244,6 @@ if __name__ == '__main__':
     args = parse_args()
     test_args(args)
 
-    avg_row_col_main(args.images, args.plot_type, args.all_switch, 
-        args.save_dst)
+    avg_row_col = AvgRowCol(args.images, args.plot_type, args.all_switch,
+                            args.save_dst)
+    avg_row_col.avg_row_col_main()
