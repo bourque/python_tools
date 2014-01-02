@@ -134,12 +134,25 @@ class ImStatBox():
                 self.frame[b1x1:b1x2,b1y1:b1y2] for b1x1,b1x2,b1y1,b1y2 in
                 zip(self.box1x1,self.box1x2,self.box1y1,self.box1y2)]
 
-        # # Perform statistics
+        # Perform statistics
         mean_list = [np.mean(region) for region in self.region_list]
         midpt_list = [np.median(region) for region in self.region_list]
         stdev_list = [np.std(region) for region in self.region_list]
         min_list = [np.min(region) for region in self.region_list]
         max_list = [np.max(region) for region in self.region_list]
+
+        num_regions = len(mean_list)
+        filename = '{}_{}.dat'.format(self.image.split('.')[0], 
+            self.coord_list.split('.')[0])
+        with open(filename, 'w') as f:
+            for i in range(num_regions):
+                f.write(
+                    'Region {} mean: {}\n'.format(i, mean_list[i]) +
+                    'Region {} midpt: {}\n'.format(i, midpt_list[i]) +
+                    'Region {} stdev: {}\n'.format(i, stdev_list[i]) +
+                    'Region {} min: {}\n'.format(i, min_list[i]) +
+                    'Region {} max: {}\n'.format(i, max_list[i])
+                    )
 
 # -----------------------------------------------------------------------------
 # For command line execution
