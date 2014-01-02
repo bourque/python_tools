@@ -15,7 +15,7 @@ where coords.dat contains:
 
 #box1x1 box1x2 box1y1 box1y2 box2x1 box2x2 box2y1 box2y2
 1.0 3.0 2.0 4.0 0.5 3.5 1.0 5.0
-12.5 13.5 6.3 9.6 0 0 0 0
+12.5 13.5 6.3 9.6 0 10 0 10
 etc.
 
 Note that, if box 2 coordinates are 0 0 0 0, the program will return statistics
@@ -27,7 +27,6 @@ import argparse
 from astropy.io import ascii
 from astropy.io import fits as pyfits
 import numpy as np
-#np.set_printoptions(threshold=np.nan)
 import os
 import matplotlib.pyplot as plt
 
@@ -50,32 +49,28 @@ class ImStatBox():
 
     # -------------------------------------------------------------------------
 
-    def build_boxes(self):
+    def determine_region(self):
         '''
-        Constructs the large box and small box (2D arrays) based on the
-        coordinates.
-        '''
-
-        self.large_box_list = [
-            self.frame[b2x1:b2x2,b2y1:b2y2] for b2x1,b2x2,b2y1,b2y2 in 
-            zip(self.box2x1,self.box2x2,self.box2y1,self.box2y2)]
-        self.small_box_list = [
-            self.frame[b1x1:b1x2,b1y1:b1y2] for b1x1,b1x2,b1y1,b1y2 in 
-            zip(self.box1x1,self.box1x2,self.box1y1,self.box1y2)]
-
-    # -------------------------------------------------------------------------
-
-    def calc_avg(self):
-        '''
-        Calculates the average row and column value.
+        Determines whether the statistics region is a box or an annlulus based
+        on the coordinates of 'box2'
         '''
 
-        self.avg_row_list = [ext_data[x1:x2,y1:y2].mean(axis=1) for ext_data, 
-            x1, x2, y1, y2 in zip(self.ext_data_list, self.x1s, self.x2s, 
-            self.y1s, self.y2s)]
-        self.avg_col_list = [ext_data[x1:x2,y1:y2].mean(axis=0) for ext_data, 
-            x1, x2, y1, y2 in zip(self.ext_data_list, self.x1s, self.x2s, 
-            self.y1s, self.y2s)]
+        # Determine if box2 coordinates are all 0s. If they are, set
+        # region_flag to True
+        self.region_flag_list = []
+        box2_list = [self.box2x1, self.box2x2, self.box2y1, self.box2y2]
+        for box2 in box2_list:
+            if all(element == 0 for element in box2) == True:
+                self.region_flag_list.append(True)
+            else:
+                self.region_flag_list.append(False)
+        
+        # If there are two boxes, stats region is annulus. If there is one
+        # box, stats region is a box.
+        if all(self.region_flag_list) == True:
+            self.region = 'box'
+        else:
+            self.region = 'annulus'
 
     # -------------------------------------------------------------------------
 
@@ -95,7 +90,6 @@ class ImStatBox():
         self.box2x2 = self.data['box2x2']
         self.box2y1 = self.data['box2y1']
         self.box2y2 = self.data['box2y2']
-
 
     # -------------------------------------------------------------------------
 
@@ -117,27 +111,35 @@ class ImStatBox():
 
         self.get_image()
         self.get_coordinates()
+        self.determine_region()
 
-        # Set small boxes to all 0s
-        for box1x1, box1x2, box1y1, box1y2 in zip(self.box1x1, self.box1x2, 
-            self.box1y1, self.box1y2):
-                self.frame[box1x1:box1x2,box1y1:box1y2] = 0.0
+        if self.region == 'annulus':
 
-        # Build large box
-        self.large_box_list = [
-            self.frame[b2x1:b2x2,b2y1:b2y2] for b2x1,b2x2,b2y1,b2y2 in 
-            zip(self.box2x1,self.box2x2,self.box2y1,self.box2y2)]
+            # Set small boxes to all 0s
+            for box1x1, box1x2, box1y1, box1y2 in zip(self.box1x1, self.box1x2,
+                self.box1y1, self.box1y2):
+                    self.frame[box1x1:box1x2,box1y1:box1y2] = 0.0
 
-        # Find indices whose values are not 0.0:
-        annulus_list = [large_box[large_box != 0.0] for large_box in 
-            self.large_box_list]
+            # Build large box
+            self.large_box_list = [
+                self.frame[b2x1:b2x2,b2y1:b2y2] for b2x1,b2x2,b2y1,b2y2 in 
+                zip(self.box2x1,self.box2x2,self.box2y1,self.box2y2)]
 
-        # Perform statistics
-        mean_list = [np.mean(annulus) for annulus in annulus_list]
-        midpt_list = [np.median(annulus) for annulus in annulus_list]
-        stdev_list = [np.std(annulus) for annulus in annulus_list]
-        min_list = [np.min(annulus) for annulus in annulus_list]
-        max_list = [np.max(annulus) for annulus in annulus_list]
+            # Find indices whose values are not 0.0:
+            self.region_list = [large_box[large_box != 0.0] for large_box in 
+                self.large_box_list]
+
+        elif self.region == 'box':
+            self.region_list = [
+                self.frame[b1x1:b1x2,b1y1:b1y2] for b1x1,b1x2,b1y1,b1y2 in
+                zip(self.box1x1,self.box1x2,self.box1y1,self.box1y2)]
+
+        # # Perform statistics
+        mean_list = [np.mean(region) for region in self.region_list]
+        midpt_list = [np.median(region) for region in self.region_list]
+        stdev_list = [np.std(region) for region in self.region_list]
+        min_list = [np.min(region) for region in self.region_list]
+        max_list = [np.max(region) for region in self.region_list]
 
 # -----------------------------------------------------------------------------
 # For command line execution
@@ -152,7 +154,7 @@ def parse_args():
     image_help = 'Path to image to be analyzed.'
     coord_list_help = 'Path to file containing rectangle coordinates.'
 
-    # Add time arguments
+    # Add arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('image', type=str, help=image_help)
     parser.add_argument('coord_list', type=str, help=coord_list_help)
