@@ -21,6 +21,8 @@ etc.
 Note that, if box 2 coordinates are 0 0 0 0, the program will return statistics
 for all pixels within box 1. Also note that, if there are two boxes, box 1 must 
 be the inner box, and box2 must be the outer box.
+
+The program will save the statistics to a file named <image>_<coords>.dat.
 '''
 
 import argparse
@@ -101,6 +103,41 @@ class ImStatBox():
         self.frame = pyfits.open(self.image)[0].data
 
     # -------------------------------------------------------------------------
+
+    def perform_statistics(self):
+        '''
+        Calculates basic statistics of the region.
+        '''
+
+        self.npix_list = [region.size for region in self.region_list]
+        self.mean_list = [np.mean(region) for region in self.region_list]
+        self.midpt_list = [np.median(region) for region in self.region_list]
+        self.stdev_list = [np.std(region) for region in self.region_list]
+        self.min_list = [np.min(region) for region in self.region_list]
+        self.max_list = [np.max(region) for region in self.region_list]
+
+    # -------------------------------------------------------------------------
+
+    def write_statistics(self):
+        '''
+        Writes statistics to output file.
+        '''
+
+        num_regions = len(self.mean_list)
+        filename = '{}_{}.dat'.format(self.image.split('.')[0], 
+            self.coord_list.split('.')[0])
+        with open(filename, 'w') as f:
+            for i in range(num_regions):
+                f.write(
+                    'Region {} npix: {}\n'.format(i, self.npix_list[i]) +
+                    'Region {} mean: {}\n'.format(i, self.mean_list[i]) +
+                    'Region {} midpt: {}\n'.format(i, self.midpt_list[i]) +
+                    'Region {} stdev: {}\n'.format(i, self.stdev_list[i]) +
+                    'Region {} min: {}\n'.format(i, self.min_list[i]) +
+                    'Region {} max: {}\n'.format(i, self.max_list[i])
+                    )
+
+    # -------------------------------------------------------------------------
     # The main controller
     # -------------------------------------------------------------------------
 
@@ -116,14 +153,14 @@ class ImStatBox():
         if self.region == 'annulus':
 
             # Set small boxes to all 0s
-            for box1x1, box1x2, box1y1, box1y2 in zip(self.box1x1, self.box1x2,
-                self.box1y1, self.box1y2):
-                    self.frame[box1x1:box1x2,box1y1:box1y2] = 0.0
+            for box1y1, box1y2, box1x1, box1x2 in zip(self.box1y1, self.box1y2,
+                self.box1x1, self.box1x2):
+                    self.frame[box1y1:box1y2,box1x1:box1x2] = 0.0
 
             # Build large box
             self.large_box_list = [
-                self.frame[b2x1:b2x2,b2y1:b2y2] for b2x1,b2x2,b2y1,b2y2 in 
-                zip(self.box2x1,self.box2x2,self.box2y1,self.box2y2)]
+                self.frame[b2y1:b2y2,b2x1:b2x2] for b2y1,b2y2,b2x1,b2x2 in 
+                zip(self.box2y1,self.box2y2,self.box2x1,self.box2x2)]
 
             # Find indices whose values are not 0.0:
             self.region_list = [large_box[large_box != 0.0] for large_box in 
@@ -131,28 +168,11 @@ class ImStatBox():
 
         elif self.region == 'box':
             self.region_list = [
-                self.frame[b1x1:b1x2,b1y1:b1y2] for b1x1,b1x2,b1y1,b1y2 in
-                zip(self.box1x1,self.box1x2,self.box1y1,self.box1y2)]
+                self.frame[b1y1:b1y2,b1x1:b1x2] for b1y1,b1y2,b1x1,b1x2 in
+                zip(self.box1y1,self.box1y2,self.box1x1,self.box1x2)]
 
-        # Perform statistics
-        mean_list = [np.mean(region) for region in self.region_list]
-        midpt_list = [np.median(region) for region in self.region_list]
-        stdev_list = [np.std(region) for region in self.region_list]
-        min_list = [np.min(region) for region in self.region_list]
-        max_list = [np.max(region) for region in self.region_list]
-
-        num_regions = len(mean_list)
-        filename = '{}_{}.dat'.format(self.image.split('.')[0], 
-            self.coord_list.split('.')[0])
-        with open(filename, 'w') as f:
-            for i in range(num_regions):
-                f.write(
-                    'Region {} mean: {}\n'.format(i, mean_list[i]) +
-                    'Region {} midpt: {}\n'.format(i, midpt_list[i]) +
-                    'Region {} stdev: {}\n'.format(i, stdev_list[i]) +
-                    'Region {} min: {}\n'.format(i, min_list[i]) +
-                    'Region {} max: {}\n'.format(i, max_list[i])
-                    )
+        self.perform_statistics()
+        self.write_statistics()
 
 # -----------------------------------------------------------------------------
 # For command line execution
