@@ -123,19 +123,13 @@ class ImStatBox():
         Writes statistics to output file.
         '''
 
-        num_regions = len(self.mean_list)
+        region_list = [i for i in range(len(self.mean_list))]
         filename = '{}_{}.dat'.format(self.image.split('.')[0], 
             self.coord_list.split('.')[0])
-        with open(filename, 'w') as f:
-            for i in range(num_regions):
-                f.write(
-                    'Region {} npix: {}\n'.format(i, self.npix_list[i]) +
-                    'Region {} mean: {}\n'.format(i, self.mean_list[i]) +
-                    'Region {} midpt: {}\n'.format(i, self.midpt_list[i]) +
-                    'Region {} stdev: {}\n'.format(i, self.stdev_list[i]) +
-                    'Region {} min: {}\n'.format(i, self.min_list[i]) +
-                    'Region {} max: {}\n'.format(i, self.max_list[i])
-                    )
+        ascii.write([region_list, self.npix_list, self.mean_list, 
+            self.midpt_list, self.stdev_list, self.min_list, self.max_list], 
+            filename, names=['region', 'npix', 'mean', 'midpt', 'stdev', 'min', 
+            'max'])
 
     # -------------------------------------------------------------------------
     # The main controller
