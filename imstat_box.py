@@ -28,6 +28,7 @@ The program will save the statistics to a file named <image>_<coords>.dat.
 import argparse
 from astropy.io import ascii
 from astropy.io import fits as pyfits
+from astropy.stats.funcs import sigma_clip
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -104,6 +105,16 @@ class ImStatBox():
 
     # -------------------------------------------------------------------------
 
+    def perform_sigma_clip(self):
+        '''
+        Uses astropy.stats.funcs.sigma_clip to perform sigma clipping of data.
+        '''
+
+        self.region_list = [sigma_clip(region, sig=3, iters=1)[0] for region 
+                            in self.region_list]
+
+    # -------------------------------------------------------------------------
+
     def perform_statistics(self):
         '''
         Calculates basic statistics of the region.
@@ -115,6 +126,20 @@ class ImStatBox():
         self.stdev_list = [np.std(region) for region in self.region_list]
         self.min_list = [np.min(region) for region in self.region_list]
         self.max_list = [np.max(region) for region in self.region_list]
+
+    # -------------------------------------------------------------------------
+
+    def plot_histograms(self):
+        '''
+        Creates a historgram of each region and saves it to a png file.
+        '''
+
+        for i in range(len(self.region_list)):
+            plt.hist(self.region_list[i], bins=30)
+            filename = '{}_{}_hist_reg_{}.png'.format(self.image.split('.')[0], 
+                self.coord_list.split('.')[0], i)
+            plt.savefig(filename)
+            plt.clf()
 
     # -------------------------------------------------------------------------
 
@@ -165,8 +190,10 @@ class ImStatBox():
                 self.frame[b1y1:b1y2,b1x1:b1x2] for b1y1,b1y2,b1x1,b1x2 in
                 zip(self.box1y1,self.box1y2,self.box1x1,self.box1x2)]
 
+        self.perform_sigma_clip()
         self.perform_statistics()
         self.write_statistics()
+        self.plot_histograms()
 
 # -----------------------------------------------------------------------------
 # For command line execution
